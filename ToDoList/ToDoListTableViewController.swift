@@ -7,19 +7,34 @@
 //
 
 import UIKit
+import CoreData
 
 class ToDoListTableViewController: UITableViewController {
 
-    var toDos : [ToDo] = []
+    // Switched to using Core Data....
+    // var toDos : [ToDo] = []
+    var toDos : [ToDoItem] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        self.toDos = self.createToDos()
+        // Not needed since we're using Core Data
+        // self.toDos = self.createToDos()
+        
+        // Using Core Data
+        getToDos()
 
+    }
+    
+    // We need to handle this override to ensure that when we come
+    // back to this view, the data is reloaded into the tableView.
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        getToDos()
     }
 
     // Initially set with dummy data to test the tableView
+    // No longer needed since we are now using Core Data
     func createToDos() -> [ToDo] {
         
         let eggs: ToDo = ToDo()
@@ -52,39 +67,104 @@ class ToDoListTableViewController: UITableViewController {
 
         let todo = toDos[indexPath.row]
         
-        var name = todo.name
-        if (todo.isImportant) {
-            name = "❗️" + name
+        // Since we're using Core Data, todo.name is now an
+        // optional.
+        if var name = todo.name {
+            
+            if (todo.isImportant) {
+                name = "❗️" + name
+            }
+
+            cell.textLabel?.text = name
         }
-        cell.textLabel?.text = name
+        
 
         return cell
     }
     
-    // In the tutorial, the code was handled by the add ToDo VC,
-    // which isn't the best.  I added the function handler instead.
-    func addNewToDo(toDo: ToDo) {
-        if let toDo = toDo as ToDo? {
-            toDos.append(toDo)
-            tableView.reloadData()
-        }
-    }
-    
-    // Added the function instead of code directly in other view
-    func completeToDo(toDo toRemove: ToDo) {
-        let count = toDos.count
+    // Get the ToDos from CoreData
+    func getToDos() {
         
-        for count in 0...(count - 1) {
+        if let context  =
+            ((UIApplication.shared.delegate as? AppDelegate)?.persistentContainer.viewContext) {
             
-            let toDo = toDos[count]
-
-            if toDo.name == toRemove.name && toDo.isImportant == toRemove.isImportant {
-                toDos.remove(at: count)
+            do {
+                let coreDataToDos = try context.fetch(ToDoItem.fetchRequest()) as? [ToDoItem]
+                
+                if let coreDataToDos = coreDataToDos {
+                    // We can just set our ToDoItem array to the one given
+                    // to us by Core Data - note that toDos is now [ToDoItem]
+                    self.toDos = coreDataToDos
+                }
+                
                 tableView.reloadData()
+            }
+            catch {
+                showAlert(message: "Could not retrieve the ToDo items from the database!  Please try again.")
                 return
             }
         }
+    }
+    
+    // In the tutorial, the code was handled by the add ToDo VC,
+    // which isn't the best.  I added the function handler instead.
+    func addNewToDo(toDo: ToDo) -> Bool {
         
+        /* Commented out to use Core Data instead
+        if let toDo = toDo as ToDo? {
+            toDos.append(toDo)
+            tableView.reloadData()
+        }*/
+        
+        var success : Bool = true
+        
+        // Get the managed object context
+        if let context  =
+            ((UIApplication.shared.delegate as? AppDelegate)?.persistentContainer.viewContext) {
+        
+            let toDoItem = ToDoItem(entity: ToDoItem.entity(), insertInto: context)
+            
+            toDoItem.name = toDo.name
+            toDoItem.isImportant = toDo.isImportant
+            
+            // This can also be handled this way:
+            // try? context.save
+            // But then there's no handling the failure case...
+            // To get the data to "reload" we need to handle
+            // viewWillAppear.
+            do {
+                try context.save()
+            }
+            catch {
+                self.showAlert(message: "Data could not be saved!  Please try again.")
+                success = false
+            }
+        }
+        return success
+    }
+    
+    // Added the function instead of code directly in other view
+    func completeToDo(toDo toRemove: ToDoItem) {
+        
+        // Using Core Data, all we need to do is remove the item
+        // from Core Data.
+        if let context  =
+            ((UIApplication.shared.delegate as? AppDelegate)?.persistentContainer.viewContext) {
+            
+            context.delete(toRemove)
+            
+            // Update the tableView
+            getToDos()
+        }
+            
+    }
+
+    func showAlert(message: String) {
+        let alertController = UIAlertController(title: "Oops!", message: message, preferredStyle: .alert)
+        let alertAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+        
+        alertController.addAction(alertAction)
+        present(alertController, animated: true, completion: nil)
     }
 
     // MARK: - Navigation
@@ -99,7 +179,7 @@ class ToDoListTableViewController: UITableViewController {
         }
         else if let completeVC = segue.destination as? CompleteToDoViewController {
             completeVC.toDoListTableViewVC = self
-            if let toDo = sender as? ToDo {
+            if let toDo = sender as? ToDoItem {
                 completeVC.selectedToDo = toDo
             }
         }

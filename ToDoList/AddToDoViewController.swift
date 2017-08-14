@@ -49,10 +49,14 @@ class AddToDoViewController: UIViewController {
         
         toDo.isImportant = importantSwitch.isOn
         
-        toDoListTableViewVC.addNewToDo(toDo: toDo)
+        // In my version, automatically return back to the main view if
+        // saving is successful.
         
-        // Return to the prior view controller.
-        navigationController?.popViewController(animated: true)
+        if true == toDoListTableViewVC.addNewToDo(toDo: toDo) {
+        
+            // Return to the prior view controller.
+            navigationController?.popViewController(animated: true)
+        }
     }
     
     func showAlert(message: String) {
